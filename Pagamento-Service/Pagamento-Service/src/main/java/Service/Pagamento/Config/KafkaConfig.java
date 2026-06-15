@@ -1,0 +1,61 @@
+package Service.Pagamento.Config;
+
+import org.apache.kafka.clients.admin.NewTopic;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.util.backoff.FixedBackOff;
+
+@Configuration
+public class KafkaConfig {
+
+
+
+@Bean
+public KafkaTemplate<String, Object> kafkaTemplate (ProducerFactory<String , Object> producerFactory){
+    return new KafkaTemplate<>(producerFactory);
+}
+
+@Bean
+public NewTopic topicPagamento(){
+    return TopicBuilder.name("pagamento-processado").partitions(1).replicas(1).build();
+}
+@Bean
+public NewTopic topicPagamentoHistorico(){
+    return TopicBuilder.name("pagamento-processado-hisstorico").partitions(1).replicas(1).build();
+}
+
+
+ @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
+            ConsumerFactory<String, Object> consumerFactory,
+            KafkaTemplate<String, Object> kafkaTemplate) {
+
+        
+        DeadLetterPublishingRecoverer recoverer = 
+            new DeadLetterPublishingRecoverer(kafkaTemplate);
+
+       
+        FixedBackOff backOff = new FixedBackOff(2000L, 5L);
+
+        DefaultErrorHandler errorHandler = 
+            new DefaultErrorHandler(recoverer, backOff);
+
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+            new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory);
+        factory.setCommonErrorHandler(errorHandler);
+
+        return factory;
+    }
+
+
+
+
+}
