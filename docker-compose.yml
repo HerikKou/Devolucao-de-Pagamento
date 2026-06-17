@@ -1,0 +1,306 @@
+version: '3.8'
+
+services:
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - devolucao-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - devolucao-network
+
+  postgres-transacao:
+    image: postgres:15
+    container_name: postgres-transacao
+    environment:
+      POSTGRES_DB: Transacao
+      POSTGRES_USER: ${DB_TRANSACAO_USER}
+      POSTGRES_PASSWORD: ${DB_TRANSACAO_PASSWORD}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_TRANSACAO_USER} -d Transacao"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devolucao-network
+
+  postgres-devolucao:
+    image: postgres:15
+    container_name: postgres-devolucao
+    environment:
+      POSTGRES_DB: Devolucao
+      POSTGRES_USER: ${DB_DEVOLUCAO_USER}
+      POSTGRES_PASSWORD: ${DB_DEVOLUCAO_PASSWORD}
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_DEVOLUCAO_USER} -d Devolucao"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devolucao-network
+
+  postgres-score:
+    image: postgres:15
+    container_name: postgres-score
+    environment:
+      POSTGRES_DB: Score
+      POSTGRES_USER: ${DB_SCORE_USER}
+      POSTGRES_PASSWORD: ${DB_SCORE_PASSWORD}
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_SCORE_USER} -d Score"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devolucao-network
+
+  postgres-decisao:
+    image: postgres:15
+    container_name: postgres-decisao
+    environment:
+      POSTGRES_DB: Decisao
+      POSTGRES_USER: ${DB_DECISAO_USER}
+      POSTGRES_PASSWORD: ${DB_DECISAO_PASSWORD}
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_DECISAO_USER} -d Decisao"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devolucao-network
+
+  postgres-pagamento:
+    image: postgres:15
+    container_name: postgres-pagamento
+    environment:
+      POSTGRES_DB: Pagamento
+      POSTGRES_USER: ${DB_PAGAMENTO_USER}
+      POSTGRES_PASSWORD: ${DB_PAGAMENTO_PASSWORD}
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_PAGAMENTO_USER} -d Pagamento"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devolucao-network
+
+  postgres-explicacao:
+    image: postgres:15
+    container_name: postgres-explicacao
+    environment:
+      POSTGRES_DB: Explicacao
+      POSTGRES_USER: ${DB_EXPLICACAO_USER}
+      POSTGRES_PASSWORD: ${DB_EXPLICACAO_PASSWORD}
+    ports:
+      - "5437:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_EXPLICACAO_USER} -d Explicacao"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devolucao-network
+
+  postgres-historico:
+    image: postgres:15
+    container_name: postgres-historico
+    environment:
+      POSTGRES_DB: Historico
+      POSTGRES_USER: ${DB_HISTORICO_USER}
+      POSTGRES_PASSWORD: ${DB_HISTORICO_PASSWORD}
+    ports:
+      - "5438:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_HISTORICO_USER} -d Historico"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devolucao-network
+
+  transacao-service:
+    build: ./transacao-service
+    container_name: transacao-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres-transacao:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-transacao:5432/Transacao
+      SPRING_DATASOURCE_USERNAME: ${DB_TRANSACAO_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_TRANSACAO_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVER_PORT: 8081
+    networks:
+      - devolucao-network
+
+  devolucao-service:
+    build: ./devolucao-service
+    container_name: devolucao-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres-devolucao:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-devolucao:5432/Devolucao
+      SPRING_DATASOURCE_USERNAME: ${DB_DEVOLUCAO_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_DEVOLUCAO_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVER_PORT: 8082
+    networks:
+      - devolucao-network
+
+  score-service:
+    build: ./score-service
+    container_name: score-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres-score:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-score:5432/Score
+      SPRING_DATASOURCE_USERNAME: ${DB_SCORE_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_SCORE_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVER_PORT: 8083
+    networks:
+      - devolucao-network
+
+  decisao-service:
+    build: ./decisao-service
+    container_name: decisao-service
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres-decisao:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-decisao:5432/Decisao
+      SPRING_DATASOURCE_USERNAME: ${DB_DECISAO_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_DECISAO_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVER_PORT: 8084
+    networks:
+      - devolucao-network
+
+  pagamento-service:
+    build: ./pagamento-service
+    container_name: pagamento-service
+    ports:
+      - "8085:8085"
+    depends_on:
+      postgres-pagamento:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-pagamento:5432/Pagamento
+      SPRING_DATASOURCE_USERNAME: ${DB_PAGAMENTO_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PAGAMENTO_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVER_PORT: 8085
+    networks:
+      - devolucao-network
+
+  llm-service:
+    build: ./llm-service
+    container_name: llm-service
+    ports:
+      - "8086:8086"
+    depends_on:
+      postgres-explicacao:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-explicacao:5432/Explicacao
+      SPRING_DATASOURCE_USERNAME: ${DB_EXPLICACAO_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_EXPLICACAO_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      SERVER_PORT: 8086
+    networks:
+      - devolucao-network
+
+  historico-service:
+    build: ./historico-service
+    container_name: historico-service
+    ports:
+      - "8087:8087"
+    depends_on:
+      postgres-historico:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-historico:5432/Historico
+      SPRING_DATASOURCE_USERNAME: ${DB_HISTORICO_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_HISTORICO_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVER_PORT: 8087
+    networks:
+      - devolucao-network
+
+  datadog-agent:
+    image: datadog/agent:latest
+    container_name: datadog-agent
+    environment:
+      DD_API_KEY: ${DD_API_KEY}
+      DD_SITE: datadoghq.com
+      DD_APM_ENABLED: "true"
+      DD_APM_NON_LOCAL_TRAFFIC: "true"
+      DD_LOGS_ENABLED: "true"
+      DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "true"
+      DD_CONTAINER_EXCLUDE: "name:datadog-agent"
+      DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+    ports:
+      - "8126:8126"
+      - "8125:8125/udp"
+    networks:
+      - devolucao-network
+
+networks:
+  devolucao-network:
+    driver: bridge
